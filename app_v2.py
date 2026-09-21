@@ -13,11 +13,9 @@ st.set_page_config(page_title="BizGame Ver.2 シミュレーター", layout="wid
 # =============================================================================
 if not firebase_admin._apps:
     if os.path.exists("firebase_key.json"):
-        # ローカル環境（PC）の場合
         cred = credentials.Certificate("firebase_key.json")
         firebase_admin.initialize_app(cred)
     else:
-        # クラウド環境（Streamlit Cloud）の場合
         try:
             firebase_secrets = dict(st.secrets["firebase"])
             cred = credentials.Certificate(firebase_secrets)
@@ -51,10 +49,7 @@ if not market:
 st.sidebar.title("ログイン")
 user_role = st.sidebar.radio("モード選択", ["プレイヤー (各チーム)", "ゲーム管理者"])
 
-st.sidebar.title("ログイン")
-user_role = st.sidebar.radio("モード選択", ["プレイヤー (各チーム)", "ゲーム管理者"])
-
-# --- ここから下のブロックを追加 ---
+# --- 公式ルールガイド ---
 st.sidebar.markdown("---")
 with st.sidebar.expander("📖 公式ルールガイドを開く"):
     st.markdown("""
@@ -70,12 +65,13 @@ with st.sidebar.expander("📖 公式ルールガイドを開く"):
     * **先端品:** 高付加価値。材料¥20 / 基本給¥8,000 / 在庫評価損20% / 価格規制 ¥50〜¥300
     
     **4. 生産と原価計算**
-    生産量は「設備」「人員」「材料在庫」の最も低い数値（ボトルネック）に制限されます。採用・解雇費も製造原価に含まれます。
+    生産量は「設備」「人員」「材料在庫」の最も低い数値（ボトルネック）に制限されます。採用・解雇費も製造労務費に含まれます。
     
     **5. ペナルティと緊急融資**
     * **債務超過:** 純資産がマイナスになると、適用金利が強制的に **20%** に跳ね上がります。
     * **緊急融資:** 現金がマイナスになった場合、自動的に年利 **20%** の緊急借入が行われ、次期に優先返済されます。
     """)
+st.sidebar.markdown("---")
 
 # =============================================================================
 # ▼ プレイヤーモード
