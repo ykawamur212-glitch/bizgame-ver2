@@ -4,16 +4,28 @@ import plotly.graph_objects as go
 import plotly.express as px
 import firebase_admin
 from firebase_admin import credentials, firestore
+import os
 
 st.set_page_config(page_title="BizGame Ver.2 シミュレーター", layout="wide")
 
+# =============================================================================
+# ▼ Firebase初期化 (ローカル/クラウド両対応)
+# =============================================================================
 if not firebase_admin._apps:
-    try:
+    if os.path.exists("firebase_key.json"):
+        # ローカル環境（PC）の場合
         cred = credentials.Certificate("firebase_key.json")
         firebase_admin.initialize_app(cred)
-    except Exception as e:
-        st.error(f"認証エラー: firebase_key.json が見つかりません。詳細: {e}")
-        st.stop()
+    else:
+        # クラウド環境（Streamlit Cloud）の場合
+        try:
+            firebase_secrets = dict(st.secrets["firebase"])
+            cred = credentials.Certificate(firebase_secrets)
+            firebase_admin.initialize_app(cred)
+        except Exception as e:
+            st.error("【クラウド認証エラー】Streamlitの「Secrets」にFirebaseの鍵情報が設定されていないか、形式が間違っています。")
+            st.error(f"詳細: {e}")
+            st.stop()
 
 db = firestore.client()
 
@@ -33,7 +45,7 @@ def get_all_teams():
 
 market = get_market_state()
 if not market:
-    st.error("データベースが初期化されていません。init_v2.pyから初期化を行ってください。")
+    st.error("データベースが初期化されていません。ローカル環境で init_v2.py から初期化を行ってください。")
     st.stop()
 
 st.sidebar.title("ログイン")
@@ -114,8 +126,8 @@ if user_role == "プレイヤー (各チーム)":
             st.subheader(f"📊 第 {last_turn} 期 業績レポート")
             
             m1, m2, m3, m4 = st.columns(4)
-            m1.metric("現預金残高", f"¥{team_data['cash']:,.0f}")
-            m2.metric("利益剰余金 (最終スコア)", f"¥{team_data['retained_earnings']:,.0f}")
+            m1.metric("現預金残高", f"¥{team_data.get('cash', 0):,.0f}")
+            m2.metric("利益剰余金 (最終スコア)", f"¥{team_data.get('retained_earnings', 0):,.0f}")
             
             net_assets_current = team_data.get('capital', 0) + team_data.get('retained_earnings', 0)
             if net_assets_current < 0:
@@ -141,7 +153,6 @@ if user_role == "プレイヤー (各チーム)":
                         ]
                     }
                     df_pl = pd.DataFrame(pl_data)
-                    # 修正: Pandas Stylerを用いて確実に3桁カンマを付与
                     st.dataframe(df_pl.style.format({"金額": "¥{:,.0f}"}), use_container_width=True, hide_index=True)
                 
                 with col_bs:
@@ -168,7 +179,6 @@ if user_role == "プレイヤー (各チーム)":
                         ]
                     }
                     df_bs = pd.DataFrame(bs_data)
-                    # 修正: Pandas Stylerを用いて確実に3桁カンマを付与
                     st.dataframe(df_bs.style.format({"金額": "¥{:,.0f}"}), use_container_width=True, hide_index=True)
 
             with tab_chart:
@@ -205,7 +215,6 @@ if user_role == "プレイヤー (各チーム)":
                 
                 df_comp = pd.DataFrame(comp_data)
                 if not df_comp.empty:
-                    # 修正: 競合分析タブも3桁カンマ付きフォーマットに変更
                     st.dataframe(
                         df_comp.style.format({
                             "汎用 価格": "¥{:,.0f}",
@@ -245,7 +254,6 @@ elif user_role == "ゲーム管理者":
 
         st.markdown("---")
         
-        # --- 新機能：各チームの財務諸表一覧表 (ターン2以降に表示) ---
         if market['turn'] > 1:
             last_t = str(market['turn'] - 1)
             st.subheader(f"📊 第 {last_t} 期 財務諸表一覧 (全チーム)")
@@ -256,7 +264,6 @@ elif user_role == "ゲーム管理者":
             for t_name, t_data in sorted(all_teams_data.items()):
                 hist = t_data.get('history', {})
                 
-                # 前期のP/L情報
                 if last_t in hist:
                     h = hist[last_t]
                     pl_data_list.append({
@@ -272,7 +279,6 @@ elif user_role == "ゲーム管理者":
                         "当期純利益": h.get('net_income', 0)
                     })
                 
-                # 現在(前期末)のB/S情報
                 em_debt = t_data.get('emergency_debt', 0)
                 normal_debt = t_data.get('debt', 0)
                 mat_inv = t_data.get('gen_mat_inventory_value', 0) + t_data.get('adv_mat_inventory_value', 0)
